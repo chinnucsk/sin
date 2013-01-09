@@ -2,11 +2,13 @@
 -author("Richard Giliam : http://github.com/nirosys").
 
 -export([main/0]).
+-compile(export_all).
 
 -on_load(init/0).
 
 -define(GENERAL_URL, "http://us.battle.net/d3/en/forum/3354739/").
 -define(PROFILE_BASE_URL, "http://us.battle.net/api/d3/profile/").
+-define(PROFILE_DIR, "./profiles/").
 
 init() ->
     case application:start(inets) of
@@ -41,4 +43,24 @@ fetchTopics([Topic | Rest]) ->
 parseTopic(TopicResponse) ->
     Parsed = mochiweb_html:parse(TopicResponse),
     Profiles = mochiweb_xpath:execute("//a[@class='view-d3-profile']/@href", Parsed),
-    0.
+    fetchProfiles(Profiles).
+
+
+fetchProfiles([]) -> 0;
+fetchProfiles([ProfileUrl | Rest]) ->
+    ProfileUrlList = binary_to_list(ProfileUrl),
+    ProfileNoSlash = string:strip(ProfileUrlList, right, $/),
+    Profile = string:substr(ProfileNoSlash, string:rchr(ProfileNoSlash, $/)+1),
+    io:format("~s~n", [Profile]),
+
+    ProfileApiUrl = string:join([?PROFILE_BASE_URL, Profile, "/"], ""),
+
+    ProfileJson = fetchUrl(ProfileApiUrl),
+    io:format("~s~n", [ProfileJson]),
+
+    OutputPath = string:join([?PROFILE_DIR, Profile, ".json"], ""),
+    ok = file:write_file(OutputPath, [ProfileJson]),
+    
+    timer:sleep(500),
+
+    1 + fetchProfiles(Rest).
